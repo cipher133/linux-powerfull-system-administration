@@ -24,8 +24,19 @@ INTERFACES="wlan0 eth0";
 
 5. Save the configuration file and exit with Ctrl + O and Ctrl + X.
 
-6. After changing the configuration file, restart dhcpd:
+6.If you have multiple network interfaces:
+
+$ vim /etc/default/isc-dhcp-server
+
+add this line to end:
+INTERFACES="wlan0 eth0" ==> be tartib un subnethayi ke tuye dhcpd.conf  ezafe kardim nic haro mizarim.
+
+7. After changing the configuration file, restart dhcpd:
 $ sudo service isc-dhcp-server restart
+or systemctl restart httpd.service
+
+8.in clients:
+$ dhclient nicname
 
 -------------------------------------------
 
