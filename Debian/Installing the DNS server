@@ -1,0 +1,181 @@
+Installing the DNS server
+----
+1. ns1: Name server one/Primary Master
+2. ns2: Name server two/Secondary Master
+3. host1: Host system one
+4. host2: Host system two, optional
+All servers should be configured in a private network. I have used the
+10.0.2.0/24 network
+
+----
+Install BIND and set up a caching name server through the following steps:
+1. On ns1, install BIND and dnsutils with the following command:
+$ sudo apt-get update
+$ sudo apt-get install bind9 dnsutils
+
+2. Open /etc/bind/named.conf.optoins, enable the forwarders section, and add
+your preferred DNS servers:
+
+forwarders {
+    8.8.8.8;
+    8.8.4.4;
+};
+
+3. Now restart BIND to apply a new configuration:
+$ sudo service bind9 restart
+
+4. Check whether the BIND server is up and running:
+$ dig -x 127.0.0.1
+
+5. You should get an output similar to the following code:
+;; Query time: 1 msec
+;; SERVER: 10.0.2.53#53(10.0.2.53)
+
+6. Use dig to external domain and check the query time:
+
+7. Dig the same domain again and cross check the query time. It should be less than
+the first query
+--------------
+
+Set up Primary Master through the following steps:
+
+1. On the ns1 server, edit /etc/bind/named.conf.options and add the acl block
+above the options block:
+acl "local" {
+10.0.2.0/24; # local network
+};
+
+2. Add the following lines under the options block:
+recursion yes;
+allow-recursion { local; };
+listen-on { 10.0.2.53; }; # ns1 IP address
+allow-transfer { none; };
+
+3. Open the /etc/bind/named.conf.local file to add forward and reverse zones:
+$ sudo nano /etc/bind/named.conf.local
+
+4. Add the forward zone:
+zone "example.com" {
+type master;
+file "/etc/bind/zones/db.example.com";
+};
+
+5. Add the reverse zone:
+zone "2.0.10.in-addr.arpa" {
+type master;
+file "/etc/bind/zones/db.10";
+};
+
+6. Create the zones directory under /etc/bind/:
+$ sudo mkdir /etc/bind/zones
+
+7. Create the forward zone file using the existing zone file, db.local, as a template:
+$ cd /etc/bind/
+$ sudo cp db.local zones/db.example.com
+
+9. Edit the SOA entry and replace localhost with FQDN of your server.
+10. Increment the serial number (you can use the current date time as the serial number,
+201507071100)
+11. Remove entries for localhost, 127.0.0.1 and ::1.
+12. Add new records:
+; name server - NS records
+@ IN NS ns.exmple.com
+; name server A records
+ns IN A 10.0.2.53
+; local - A records
+host1 IN A 10.0.2.58
+13. Save the changes and exit the nano editor. The final file should look similar to the
+following image:
+
+14. Now create the reverse zone file using /etc/bind/db.127 as a template:
+$ sudo cp db.127 zones/db.10
+
+16. Change the SOA record and increment the serial number.
+17. Remove NS and PTR records for localhost.
+18. Add NS, PTR, and host records:
+
+; NS records
+@ IN NS ns.example.com
+; PTR records
+53 IN PTR ns.example.com
+; host records
+58 IN PTR host1.example.com
+
+20. Check the configuration files for syntax errors. It should end with no output:
+$ sudo named-checkconf
+21. Check zone files for syntax errors:
+$ sudo named-checkzone example.com /etc/bind/zones/db.example.com
+22. If there are no errors, you should see an output similar to the following:
+zone example.com/IN: loaded serial 3
+OK
+23. Check the reverse zone file, zones/db.10:
+$ sudo named-checkzone example.com /etc/bind/zones/db.10
+24. If there are no errors, you should see output similar to the following:
+zone example.com/IN: loaded serial 3
+OK
+25. Now restart the DNS server bind:
+$ sudo service bind9 restart
+26. Log in to host2 and configure it to use ns.example.com as a DNS server. Add
+ns.example.com to /etc/resolve.conf on host2.
+27. Test forward lookup with the nslookup command:
+$ nslookup host1.example.com
+
+28. You should see an output similar to following:
+$ nslookup host1.example.com
+Server: 10.0.2.53
+Address: 10.0.2.53#53
+Name: host1.example.com
+Address: 10.0.2.58
+29. Now test the reverse lookup:
+$ nslookup 10.0.2.58
+30. It should output something similar to the following:
+$ nslookup 10.0.2.58
+Server: 10.0.2.53
+Address: 10.0.2.53#53
+58.2.0.10.in-addr.arpa name = host1.example.com
+Set up Secondary Master through the following steps:
+1. First, allow zone transfer on Primary Master by setting the allow-transfer
+option in /etc/bind/named.conf.local:
+zone "example.com" {
+type master;
+file "/etc/bind/zones/db.example.com";
+allow-transfer { 10.0.2.54; };
+};
+zone "2.0.10.in-addr.arpa" {
+type master;
+file "/etc/bind/zones/db.10";
+allow-transfer { 10.0.2.54; };
+};
+---------------------------------------------------------------
+Note:
+A syntax check will throw errors if you miss semicolons.
+2. Restart BIND9 on Primary Master:
+$ sudo service bind9 restart
+3. On Secondary Master (ns2), install the BIND package.
+4. Edit /etc/bind/named.conf.local to add zone declarations as follows:
+zone "example.com" {
+type slave;
+file "db.example.com";
+masters { 10.0.2.53; };
+};
+zone "2.0.10.in-addr.arpa" {
+type slave;
+file "db.10";
+masters { 10.0.2.53; };
+};
+5. Save the changes made to named.conf.local.
+6. Restart the BIND server on Secondary Master:
+$ sudo service bind9 restart
+7. This will initiate the transfer of all zones configured on Primary Master. You can
+check the logs on Secondary Master at /var/log/syslog to verify the zone
+transfer.
+
+-----------------------------------------
+####  Tip  ######
+A zone is transferred only if the serial number under the SOA section on Primary Master
+is greater than that of Secondary Master. Make sure that you increment the serial number
+after every change to the zone file.
+
+
+
+
