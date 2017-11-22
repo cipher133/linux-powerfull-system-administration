@@ -1,5 +1,5 @@
 Installing the DHCP server
----
+-----------------------------------
 Follow these steps to install a DHCP server:
 
 1. Install a DHCP server:
@@ -19,9 +19,21 @@ range 192.168.1.150 192.168.1.200;
 option routers 192.168.1.1;
 option domain-name-servers 192.168.1.2, 192.168.1.3;
 option domain-name "example.com";
+INTERFACES="wlan0 eth0";
 }
 
 5. Save the configuration file and exit with Ctrl + O and Ctrl + X.
 
 6. After changing the configuration file, restart dhcpd:
 $ sudo service isc-dhcp-server restart
+
+-------------------------------------------
+
+To create a reservation, add the following lines to dhcpd.conf
+
+host Server1 {
+hardware ethernet 08:D2:1F:50:F0:6F;
+fixed-address 192.168.1.201;
+}
+
+----------------------------------------
